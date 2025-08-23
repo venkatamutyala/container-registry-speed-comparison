@@ -32,10 +32,6 @@ jobs:
         run: |
           # --- Configuration ---
           LOG_FILE="pull_times.csv"
-          #IMAGES=(
-          #  "quay.io/glueops/mirror/glueops/codespaces:v0.99.0"
-          #  "ghcr.io/glueops/codespaces:v0.99.0"
-          #)
           IMAGES=(
             "quay.io/argoproj/argocd:latest"
             "ghcr.io/argoproj/argo-cd/argocd:3.2.0-7129a2c1"
@@ -55,13 +51,22 @@ jobs:
             docker rmi "$IMG" || true
             docker image prune -af
 
-            # 2. Pull and record time
+            # 2. Pull and record time using a robust method
             TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
             
-            # ⭐️ THIS IS THE CORRECTED LINE ⭐️
-            # We redirect docker pull's stderr to /dev/null to ignore its progress bars,
-            # ensuring only the time measurement is captured.
-            PULL_TIME=$( { /usr/bin/time -f "%e" docker pull "$IMG" 2>/dev/null; } 2>&1 )
+            # ⭐️ THIS IS THE NEW ROBUST FIX ⭐️
+            # Create a temporary file to store the time measurement
+            TIME_FILE=$(mktemp)
+            
+            # Run the pull, sending all its output to /dev/null
+            # The `time` command writes its result directly to the temp file
+            /usr/bin/time -f "%e" -o "$TIME_FILE" docker pull "$IMG" > /dev/null 2>&1
+            
+            # Read the clean time measurement from the temp file
+            PULL_TIME=$(cat "$TIME_FILE")
+            
+            # Clean up the temp file
+            rm "$TIME_FILE"
             
             # 3. Extract registry name for the log
             REGISTRY=$(echo "$IMG" | cut -d'/' -f1)
