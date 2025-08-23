@@ -17,7 +17,7 @@ jobs:
       contents: write
       
     steps:
-      - name:  checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: 🐍 Set up Python
@@ -53,7 +53,10 @@ jobs:
 
             # 2. Pull and record time
             TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-            PULL_TIME=$( { /usr/bin/time -f "%e" docker pull "$IMG"; } 2>&1 )
+            
+            # ⭐️ THIS IS THE CORRECTED LINE ⭐️
+            # We redirect docker pull's stderr to /dev/null to ignore its progress bars
+            PULL_TIME=$( { /usr/bin/time -f "%e" docker pull "$IMG" 2>/dev/null; } 2>&1 )
             
             # 3. Extract registry name for the log
             REGISTRY=$(echo "$IMG" | cut -d'/' -f1)
@@ -81,6 +84,13 @@ jobs:
           except FileNotFoundError:
               print("Log file not found. Skipping chart generation.")
               exit(0)
+          except Exception as e:
+              print(f"Error processing CSV: {e}")
+              print("CSV content:")
+              with open('pull_times.csv', 'r') as f:
+                  print(f.read())
+              exit(1)
+
 
           # Pivot the data for plotting
           pivot_df = df.pivot(index='timestamp', columns='registry', values='pull_time')
