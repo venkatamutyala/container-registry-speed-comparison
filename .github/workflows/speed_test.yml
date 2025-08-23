@@ -22,8 +22,8 @@ jobs:
         # Define registries to test
         registry:
           - host: ghcr.io
-            user_secret: $GITHUB_ACTOR
-            token_secret: $GITHUB_TOKEN
+            user_secret: ${{ github.actor }}
+            token_secret: ${{ secrets.GITHUB_TOKEN }}
           - host: docker.io
             user_secret: venkatamutyala
             token_secret: ${{ secrets.DOCKERHUB_TOKEN }}
