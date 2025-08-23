@@ -13,6 +13,9 @@ on:
 jobs:
   compare-and-chart:
     runs-on: ubuntu-latest
+    concurrency:
+      group: limit-job-concurrency-do-not-remove
+      cancel-in-progress: false
     permissions:
       contents: write
       
