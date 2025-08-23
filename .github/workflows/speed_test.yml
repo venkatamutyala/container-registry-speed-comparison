@@ -36,8 +36,8 @@ jobs:
           # --- Configuration ---
           LOG_FILE="pull_times.csv"
           IMAGES=(
-            "quay.io/argoproj/argocd:latest"
-            "ghcr.io/argoproj/argo-cd/argocd:3.2.0-7129a2c1"
+           "quay.io/glueops/mirror/glueops/codespaces:v0.99.0"
+           "ghcr.io/glueops/codespaces:v0.99.0"
           )
 
           # --- Create log file with headers if it doesn't exist ---
