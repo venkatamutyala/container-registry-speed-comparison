@@ -17,7 +17,8 @@ jobs:
       matrix:
         registry: ['ghcr.io', 'docker.io']
         image_size_mb: [8, 64, 256, 512, 1024]
-
+        run_number: [1, 2, 3] # Add this to run each test 3 times
+       
     steps:
       - name: ⬇️ Check out repository
         uses: actions/checkout@v4
