@@ -1,33 +1,33 @@
 name: 🐳 Container Registry Speed Test
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-  # Runs the workflow automatically every day at midnight UTC
   schedule:
     - cron: '0 0 * * *'
 
-# Grant permissions for committing files and pushing to GHCR
 permissions:
   contents: write
   packages: write
 
 jobs:
-  # JOB 1: Run tests in parallel for each registry and image size
   run-tests:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false # Ensures all tests run even if one fails
+      fail-fast: false
       matrix:
-        # Use a simple list of strings for the registry.
         registry: ['ghcr.io', 'docker.io']
-        
-        # Define image sizes to test in Megabytes (MB).
         image_size_mb: [8, 64, 256, 512, 1024]
 
     steps:
       - name: ⬇️ Check out repository
         uses: actions/checkout@v4
+
+      - name: 📝 Initialize results file with header
+        run: |
+          mkdir -p results
+          if [ ! -f results/data.csv ]; then
+            echo "Timestamp,Registry,SizeMB,PushTime,ColdPullTime,WarmPullTime" > results/data.csv
+          fi
 
       - name: 🐋 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -52,45 +52,31 @@ jobs:
         run: |
           IMAGE_TAG="${{ matrix.registry }}/${{ github.repository }}:${{ matrix.image_size_mb }}mb-${{ github.run_id }}"
           echo "Testing with image: $IMAGE_TAG of size ${{ matrix.image_size_mb }}MB"
-          
-          # 1. BUILD & PUSH TEST
           docker build --build-arg DUMMY_SIZE_MB=${{ matrix.image_size_mb }} -t $IMAGE_TAG .
           START_PUSH=$(date +%s%3N)
           docker push $IMAGE_TAG
           END_PUSH=$(date +%s%3N)
           PUSH_TIME=$((END_PUSH - START_PUSH))
-          
-          # Clean up for cold pull
           docker rmi $IMAGE_TAG
-          
-          # 2. COLD PULL TEST
           START_COLD_PULL=$(date +%s%3N)
           docker pull $IMAGE_TAG
           END_COLD_PULL=$(date +%s%3N)
           COLD_PULL_TIME=$((END_COLD_PULL - START_COLD_PULL))
-
-          # 3. WARM PULL TEST
           START_WARM_PULL=$(date +%s%3N)
           docker pull $IMAGE_TAG
           END_WARM_PULL=$(date +%s%3N)
           WARM_PULL_TIME=$((END_WARM_PULL - START_WARM_PULL))
-          
-          # Prepare result for this specific job run
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           RESULT_LINE="$TIMESTAMP,${{ matrix.registry }},${{ matrix.image_size_mb }},$PUSH_TIME,$COLD_PULL_TIME,$WARM_PULL_TIME"
-          
-          # Write result to a unique file
           mkdir -p individual-results
           echo "$RESULT_LINE" >> individual-results/result-${{ matrix.registry }}-${{ matrix.image_size_mb }}mb.csv
 
       - name: 📤 Upload result as artifact
         uses: actions/upload-artifact@v4
         with:
-          # Make the artifact name unique for each job to prevent conflicts
           name: speed-test-results-${{ matrix.registry }}-${{ matrix.image_size_mb }}
           path: individual-results/
 
-  # JOB 2: Aggregate results and generate charts
   aggregate-and-chart:
     needs: run-tests
     runs-on: ubuntu-latest
@@ -101,16 +87,14 @@ jobs:
       - name: 📥 Download all result artifacts
         uses: actions/download-artifact@v4
         with:
-          # No name is specified, so it downloads ALL artifacts from the run
           path: all-results
 
       - name: 🗂️ Aggregate results into main data file
         run: |
-          mkdir -p results
           # Append all new results from the downloaded artifacts to the historical data file
           cat all-results/**/*.csv >> results/data.csv
-          # Optional: Sort the file by timestamp to keep it organized
-          sort -o results/data.csv results/data.csv
+          # Use tail + sort to keep header and sort data, then save
+          (head -n 1 results/data.csv && tail -n +2 results/data.csv | sort -u) > results/data.sorted.csv && mv results/data.sorted.csv results/data.csv
 
       - name: 💾 Commit aggregated data
         uses: stefanzweifel/git-auto-commit-action@v5
@@ -119,31 +103,4 @@ jobs:
           file_pattern: "results/data.csv"
 
       - name: 📊 Generate Push Performance Chart
-        uses: github-actions-x/commit-plot@v1
-        with:
-          title: "Push Performance (Time vs. Image Size)"
-          data: "results/data.csv"
-          output: "chart-push-performance.svg"
-          x_label: "Image Size (MB)"
-          y_label: "Time (ms)"
-          x: 3
-          y: 4
-          group: 2
-
-      - name: 📊 Generate Cold Pull Performance Chart
-        uses: github-actions-x/commit-plot@v1
-        with:
-          title: "Cold Pull Performance (Time vs. Image Size)"
-          data: "results/data.csv"
-          output: "chart-cold-pull-performance.svg"
-          x_label: "Image Size (MB)"
-          y_label: "Time (ms)"
-          x: 3
-          y: 5
-          group: 2
-
-      - name: 💾 Commit charts
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(charts): Update performance charts"
-          file_pattern: "*.svg"
+        uses: MatteoH2
