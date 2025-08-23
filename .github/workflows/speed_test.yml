@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         registry: ['ghcr.io', 'docker.io']
-        image_size_mb: [8, 64]
+        image_size_mb: [8, 64, 256, 512, 1024]
 
     steps:
       - name: ⬇️ Check out repository
@@ -50,9 +50,7 @@ jobs:
 
       - name: 🧪 Run Speed Tests
         run: |
-          # The /speed-test suffix has been removed from the image name below
           IMAGE_TAG="${{ matrix.registry }}/${{ github.repository }}:${{ matrix.image_size_mb }}mb-${{ github.run_id }}"
-          echo "Testing with image: $IMAGE_TAG of size ${{ matrix.image_size_mb }}MB"
           docker build --build-arg DUMMY_SIZE_MB=${{ matrix.image_size_mb }} -t $IMAGE_TAG .
           START_PUSH=$(date +%s%3N)
           docker push $IMAGE_TAG
@@ -92,6 +90,7 @@ jobs:
 
       - name: 🗂️ Aggregate results into main data file
         run: |
+          mkdir -p results
           cat all-results/**/*.csv >> results/data.csv
           (head -n 1 results/data.csv && tail -n +2 results/data.csv | sort -u) > results/data.sorted.csv && mv results/data.sorted.csv results/data.csv
 
