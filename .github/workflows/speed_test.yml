@@ -26,7 +26,7 @@ jobs:
             token_secret: $GITHUB_TOKEN
           - host: docker.io
             user_secret: venkatamutyala
-            token_secret: DOCKERHUB_TOKEN
+            token_secret: ${{ secrets.DOCKERHUB_TOKEN }}
         
         # Define image sizes to test in Megabytes (MB).
         # Add more sizes as needed (e.g., 2048 for 2GB, 5120 for 5GB).
