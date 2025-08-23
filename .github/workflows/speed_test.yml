@@ -103,4 +103,19 @@ jobs:
           file_pattern: "results/data.csv"
 
       - name: 📊 Generate Push Performance Chart
-        uses: MatteoH2
+        uses: MatteoH2O1999/csv-plot-action@v1.5.0
+        with:
+          csv_path: 'results/data.csv'
+          output_path: 'chart-cold-pull-performance.svg'
+          title: 'Cold Pull Performance (Time vs. Image Size)'
+          x_column_name: 'SizeMB'
+          y_column_name: 'ColdPullTime'
+          group_by_column_name: 'Registry'
+          x_label: 'Image Size (MB)'
+          y_label: 'Time (ms)'
+
+      - name: 💾 Commit charts
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(charts): Update performance charts"
+          file_pattern: "*.svg"
