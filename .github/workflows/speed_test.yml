@@ -19,10 +19,10 @@ jobs:
     strategy:
       fail-fast: false # Ensures all tests run even if one fails
       matrix:
-        # CORRECTED: Use a simple list of strings for the registry.
+        # Use a simple list of strings for the registry.
         registry: ['ghcr.io', 'docker.io']
         
-        # This remains the same.
+        # Define image sizes to test in Megabytes (MB).
         image_size_mb: [8, 64, 256, 512, 1024]
 
     steps:
@@ -32,7 +32,6 @@ jobs:
       - name: 🐋 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # CORRECTED: Use conditional steps for logging in to each specific registry.
       - name: 🔐 Log in to GHCR
         if: matrix.registry == 'ghcr.io'
         uses: docker/login-action@v3
@@ -46,13 +45,11 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: docker.io
-          # Best practice: Store your username in a secret.
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: 🧪 Run Speed Tests
         run: |
-          # CORRECTED: Use matrix.registry directly, not matrix.registry.host
           IMAGE_TAG="${{ matrix.registry }}/${{ github.repository }}/speed-test:${{ matrix.image_size_mb }}mb-${{ github.run_id }}"
           echo "Testing with image: $IMAGE_TAG of size ${{ matrix.image_size_mb }}MB"
           
@@ -89,10 +86,11 @@ jobs:
       - name: 📤 Upload result as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: speed-test-results
+          # Make the artifact name unique for each job to prevent conflicts
+          name: speed-test-results-${{ matrix.registry }}-${{ matrix.image_size_mb }}
           path: individual-results/
 
-  # JOB 2: Aggregate results and generate charts (This job was correct and remains unchanged)
+  # JOB 2: Aggregate results and generate charts
   aggregate-and-chart:
     needs: run-tests
     runs-on: ubuntu-latest
@@ -103,13 +101,15 @@ jobs:
       - name: 📥 Download all result artifacts
         uses: actions/download-artifact@v4
         with:
-          name: speed-test-results
+          # No name is specified, so it downloads ALL artifacts from the run
           path: all-results
 
       - name: 🗂️ Aggregate results into main data file
         run: |
           mkdir -p results
+          # Append all new results from the downloaded artifacts to the historical data file
           cat all-results/**/*.csv >> results/data.csv
+          # Optional: Sort the file by timestamp to keep it organized
           sort -o results/data.csv results/data.csv
 
       - name: 💾 Commit aggregated data
