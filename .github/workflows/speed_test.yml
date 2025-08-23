@@ -38,7 +38,7 @@ jobs:
           #)
           IMAGES=(
             "quay.io/argoproj/argocd:latest"
-            "ghcr.io/argoproj/argo-cd/argocd:latest"
+            "ghcr.io/argoproj/argo-cd/argocd:3.2.0-7129a2c1"
           )
 
           # --- Create log file with headers if it doesn't exist ---
