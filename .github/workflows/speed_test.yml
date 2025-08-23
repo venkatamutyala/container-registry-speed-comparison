@@ -81,30 +81,6 @@ jobs:
         with:
           path: all-results
 
-      - name: 🗂️ Aggregate results into main data file
-        run: |
-          mkdir -p results
-          # If data.csv doesn't exist after checkout, create it with a header
-          if [ ! -f results/data.csv ]; then
-            echo "Timestamp,Registry,SizeMB,PushTime,ColdPullTime,WarmPullTime" > results/data.csv
-          fi
-          # Append all new data from the artifacts
-          cat all-results/**/*.csv >> results/data.csv
-          # Sort the file, keeping the header on top
-          (head -n 1 results/data.csv && tail -n +2 results/data.csv | sort -u) > results/data.sorted.csv && mv results/data.sorted.csv results/data.csv
-
-      - name: 💾 Commit aggregated data
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(data): Add new registry speed test results"
-          file_pattern: "results/data.csv"
-
-      - name: 🔍 Verify CSV content before plotting
-        run: |
-          echo "--- Verifying contents of results/data.csv ---"
-          head -n 5 results/data.csv
-          echo "--- End of verification ---"
-
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
@@ -113,32 +89,11 @@ jobs:
       - name: 📦 Install Python dependencies
         run: pip install pandas matplotlib
 
-      - name: 📊 Generate Push Performance Chart
-        run: |
-          python .github/scripts/generate_chart.py \
-            'results/data.csv' \
-            'chart-push-performance.svg' \
-            'Push Performance (Time vs. Image Size)' \
-            'SizeMB' \
-            'PushTime' \
-            'Registry' \
-            'Image Size (MB)' \
-            'Time (ms)'
+      - name: 📊 Process Data and Generate Charts
+        run: python .github/scripts/generate_chart.py
 
-      - name: 📊 Generate Cold Pull Performance Chart
-        run: |
-          python .github/scripts/generate_chart.py \
-            'results/data.csv' \
-            'chart-cold-pull-performance.svg' \
-            'Cold Pull Performance (Time vs. Image Size)' \
-            'SizeMB' \
-            'ColdPullTime' \
-            'Registry' \
-            'Image Size (MB)' \
-            'Time (ms)'
-
-      - name: 💾 Commit charts
+      - name: 💾 Commit data and charts
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore(charts): Update performance charts"
-          file_pattern: "*.svg"
+          commit_message: "chore(data): Update registry performance data and charts"
+          file_pattern: "results/data.csv chart-*.svg"
