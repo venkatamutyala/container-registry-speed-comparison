@@ -1,87 +1,24 @@
-name: 🐳 Container Registry Speed Test
+# .github/workflows/compare-speeds.yml
+
+name: 📊 Compare Docker Pull Speeds
 
 on:
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+  # Runs the job on a schedule (e.g., every day at midnight UTC)
   schedule:
     - cron: '0 0 * * *'
 
-permissions:
-  contents: write
-  packages: write
-
 jobs:
-  run-tests:
+  compare-and-chart:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        registry: ['ghcr.io', 'docker.io']
-        image_size_mb: [8, 64, 256, 512, 1024, 2048, 3072, 4096, 5120, 6144]
-        run_number: [1, 2, 3] # Run each combination 3 times for averaging
-
+    permissions:
+      contents: write
+      
     steps:
-      - name: ⬇️ Check out repository
+      - name:  checkout code
         uses: actions/checkout@v4
-
-      - name: 🐋 Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: 🔐 Log in to GHCR
-        if: matrix.registry == 'ghcr.io'
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 🔐 Log in to Docker Hub
-        if: matrix.registry == 'docker.io'
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: 🧪 Run Speed Tests
-        run: |
-          IMAGE_TAG="${{ matrix.registry }}/${{ github.repository }}:${{ matrix.image_size_mb }}mb-${{ github.run_id }}-${{ matrix.run_number }}"
-          docker build --build-arg DUMMY_SIZE_MB=${{ matrix.image_size_mb }} -t $IMAGE_TAG .
-          START_PUSH=$(date +%s%3N)
-          docker push $IMAGE_TAG
-          END_PUSH=$(date +%s%3N)
-          PUSH_TIME=$((END_PUSH - START_PUSH))
-          docker rmi $IMAGE_TAG
-          START_COLD_PULL=$(date +%s%3N)
-          docker pull $IMAGE_TAG
-          END_COLD_PULL=$(date +%s%3N)
-          COLD_PULL_TIME=$((END_COLD_PULL - START_COLD_PULL))
-          START_WARM_PULL=$(date +%s%3N)
-          docker pull $IMAGE_TAG
-          END_WARM_PULL=$(date +%s%3N)
-          WARM_PULL_TIME=$((END_WARM_PULL - START_WARM_PULL))
-          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          RESULT_LINE="$TIMESTAMP,${{ matrix.registry }},${{ matrix.image_size_mb }},$PUSH_TIME,$COLD_PULL_TIME,$WARM_PULL_TIME"
-          mkdir -p individual-results
-          echo "$RESULT_LINE" >> individual-results/result-${{ matrix.registry }}-${{ matrix.image_size_mb }}-${{ matrix.run_number }}.csv
-
-      - name: 📤 Upload result as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          # Add run_number to make the name fully unique
-          name: speed-test-results-${{ matrix.registry }}-${{ matrix.image_size_mb }}-${{ matrix.run_number }}
-          path: individual-results/
-
-  aggregate-and-chart:
-    needs: run-tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: ⬇️ Check out repository
-        uses: actions/checkout@v4
-
-      - name: 📥 Download all result artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: all-results
 
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
@@ -91,11 +28,93 @@ jobs:
       - name: 📦 Install Python dependencies
         run: pip install pandas matplotlib
 
-      - name: 📊 Process Data and Generate Charts
-        run: python .github/scripts/generate_chart.py
+      - name: ⏱️ Pull images and record times
+        run: |
+          # --- Configuration ---
+          LOG_FILE="pull_times.csv"
+          IMAGES=(
+            "quay.io/glueops/mirror/glueops/codespaces:v0.99.0"
+            "ghcr.io/glueops/codespaces:v0.99.0"
+          )
 
-      - name: 💾 Commit data and charts
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "chore(data): Update registry performance data and charts"
-          file_pattern: "results/data.csv chart-*.svg"
+          # --- Create log file with headers if it doesn't exist ---
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "timestamp,registry,pull_time" > "$LOG_FILE"
+          fi
+
+          # --- Loop through images, pull, and record time ---
+          for IMG in "${IMAGES[@]}"; do
+            echo "--- Testing image: $IMG ---"
+            
+            # 1. Clean up local image to ensure a fresh pull
+            echo "Cleaning up local image..."
+            docker rmi "$IMG" || true
+            docker image prune -af
+
+            # 2. Pull and record time
+            TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+            PULL_TIME=$( { /usr/bin/time -f "%e" docker pull "$IMG"; } 2>&1 )
+            
+            # 3. Extract registry name for the log
+            REGISTRY=$(echo "$IMG" | cut -d'/' -f1)
+            
+            # 4. Append result to CSV
+            echo "$TIMESTAMP,$REGISTRY,$PULL_TIME" >> "$LOG_FILE"
+            echo "Pull time for $REGISTRY was $PULL_TIME seconds."
+          done
+
+
+      - name: 📈 Generate plot from data
+        run: |
+          cat << EOF > plot_chart.py
+          import pandas as pd
+          import matplotlib.pyplot as plt
+
+          # Load and prepare the data
+          try:
+              df = pd.read_csv('pull_times.csv')
+              if df.empty:
+                  print("Log file is empty. Skipping chart generation.")
+                  exit(0)
+              df['timestamp'] = pd.to_datetime(df['timestamp'])
+              df.sort_values('timestamp', inplace=True)
+          except FileNotFoundError:
+              print("Log file not found. Skipping chart generation.")
+              exit(0)
+
+          # Pivot the data for plotting
+          pivot_df = df.pivot(index='timestamp', columns='registry', values='pull_time')
+
+          # Create the plot
+          fig, ax = plt.subplots(figsize=(10, 6))
+          pivot_df.plot(ax=ax, marker='o', linestyle='-')
+
+          # Formatting
+          ax.set_title('Docker Pull Speed Comparison (Lower is Better)')
+          ax.set_xlabel('Date')
+          ax.set_ylabel('Pull Time (seconds)')
+          ax.legend(title='Registry')
+          ax.grid(True, which='both', linestyle='--', linewidth=0.5)
+          plt.xticks(rotation=25)
+          plt.tight_layout()
+
+          # Save the plot as an SVG file
+          plt.savefig('pull_speed_chart.svg', format='svg')
+          print("SVG chart generated successfully.")
+          EOF
+
+          python plot_chart.py
+
+      - name: 💾 Commit and push results
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add pull_times.csv pull_speed_chart.svg
+          
+          # Commit only if there are changes
+          if ! git diff --staged --quiet; then
+            git commit -m "📊 Update pull speed data and chart"
+            git push
+          else
+            echo "No changes to commit."
+          fi
