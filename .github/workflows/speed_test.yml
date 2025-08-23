@@ -8,7 +8,7 @@ on:
 
   # Runs the job on a schedule (e.g., every day at midnight UTC)
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/5 * * * *'
 
 jobs:
   compare-and-chart:
