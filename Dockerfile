@@ -5,7 +5,7 @@ FROM alpine:latest
 ARG DUMMY_SIZE_MB=8
 
 # Install tools needed to create the file
-RUN apk add --no-cache coreutils # dd is in the coreutils package
+RUN apk add --no-cache coreutils
 
-# Create a dummy file of the specified size by writing actual zeros to it
-RUN dd if=/dev/zero of=/dummy_file bs=1M count=${DUMMY_SIZE_MB}
+# Create a dummy file of the specified size by writing incompressible random data
+RUN dd if=/dev/urandom of=/dummy_file bs=1M count=${DUMMY_SIZE_MB}
