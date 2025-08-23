@@ -99,6 +99,12 @@ jobs:
           commit_message: "chore(data): Add new registry speed test results"
           file_pattern: "results/data.csv"
 
+      - name: 🔍 Verify CSV content before plotting
+        run: |
+          echo "--- Verifying contents of results/data.csv ---"
+          head -n 5 results/data.csv
+          echo "--- End of verification ---"
+
       - name: 🐍 Set up Python
         uses: actions/setup-python@v5
         with:
