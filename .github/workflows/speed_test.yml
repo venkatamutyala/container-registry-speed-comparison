@@ -55,7 +55,8 @@ jobs:
             TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
             
             # ⭐️ THIS IS THE CORRECTED LINE ⭐️
-            # We redirect docker pull's stderr to /dev/null to ignore its progress bars
+            # We redirect docker pull's stderr to /dev/null to ignore its progress bars,
+            # ensuring only the time measurement is captured.
             PULL_TIME=$( { /usr/bin/time -f "%e" docker pull "$IMG" 2>/dev/null; } 2>&1 )
             
             # 3. Extract registry name for the log
@@ -65,7 +66,6 @@ jobs:
             echo "$TIMESTAMP,$REGISTRY,$PULL_TIME" >> "$LOG_FILE"
             echo "Pull time for $REGISTRY was $PULL_TIME seconds."
           done
-
 
       - name: 📈 Generate plot from data
         run: |
@@ -90,7 +90,6 @@ jobs:
               with open('pull_times.csv', 'r') as f:
                   print(f.read())
               exit(1)
-
 
           # Pivot the data for plotting
           pivot_df = df.pivot(index='timestamp', columns='registry', values='pull_time')
