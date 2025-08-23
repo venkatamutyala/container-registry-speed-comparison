@@ -32,9 +32,13 @@ jobs:
         run: |
           # --- Configuration ---
           LOG_FILE="pull_times.csv"
+          #IMAGES=(
+          #  "quay.io/glueops/mirror/glueops/codespaces:v0.99.0"
+          #  "ghcr.io/glueops/codespaces:v0.99.0"
+          #)
           IMAGES=(
-            "quay.io/glueops/mirror/glueops/codespaces:v0.99.0"
-            "ghcr.io/glueops/codespaces:v0.99.0"
+            "quay.io/argoproj/argocd:latest"
+            "ghcr.io/argoproj/argocd:latest"
           )
 
           # --- Create log file with headers if it doesn't exist ---
