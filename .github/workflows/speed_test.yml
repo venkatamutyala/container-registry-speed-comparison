@@ -53,3 +53,49 @@ jobs:
           docker rmi $IMAGE_TAG
           START_COLD_PULL=$(date +%s%3N)
           docker pull $IMAGE_TAG
+          END_COLD_PULL=$(date +%s%3N)
+          COLD_PULL_TIME=$((END_COLD_PULL - START_COLD_PULL))
+          START_WARM_PULL=$(date +%s%3N)
+          docker pull $IMAGE_TAG
+          END_WARM_PULL=$(date +%s%3N)
+          WARM_PULL_TIME=$((END_WARM_PULL - START_WARM_PULL))
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          RESULT_LINE="$TIMESTAMP,${{ matrix.registry }},${{ matrix.image_size_mb }},$PUSH_TIME,$COLD_PULL_TIME,$WARM_PULL_TIME"
+          mkdir -p individual-results
+          echo "$RESULT_LINE" >> individual-results/result-${{ matrix.registry }}-${{ matrix.image_size_mb }}-${{ matrix.run_number }}.csv
+
+      - name: 📤 Upload result as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          # Add run_number to make the name fully unique
+          name: speed-test-results-${{ matrix.registry }}-${{ matrix.image_size_mb }}-${{ matrix.run_number }}
+          path: individual-results/
+
+  aggregate-and-chart:
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Check out repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all result artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-results
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 📦 Install Python dependencies
+        run: pip install pandas matplotlib
+
+      - name: 📊 Process Data and Generate Charts
+        run: python .github/scripts/generate_chart.py
+
+      - name: 💾 Commit data and charts
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(data): Update registry performance data and charts"
+          file_pattern: "results/data.csv chart-*.svg"
