@@ -22,13 +22,6 @@ jobs:
       - name: ⬇️ Check out repository
         uses: actions/checkout@v4
 
-      - name: 📝 Initialize results file with header
-        run: |
-          mkdir -p results
-          if [ ! -f results/data.csv ]; then
-            echo "Timestamp,Registry,SizeMB,PushTime,ColdPullTime,WarmPullTime" > results/data.csv
-          fi
-
       - name: 🐋 Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -91,7 +84,13 @@ jobs:
       - name: 🗂️ Aggregate results into main data file
         run: |
           mkdir -p results
+          # If data.csv doesn't exist after checkout, create it with a header
+          if [ ! -f results/data.csv ]; then
+            echo "Timestamp,Registry,SizeMB,PushTime,ColdPullTime,WarmPullTime" > results/data.csv
+          fi
+          # Append all new data from the artifacts
           cat all-results/**/*.csv >> results/data.csv
+          # Sort the file, keeping the header on top
           (head -n 1 results/data.csv && tail -n +2 results/data.csv | sort -u) > results/data.sorted.csv && mv results/data.sorted.csv results/data.csv
 
       - name: 💾 Commit aggregated data
