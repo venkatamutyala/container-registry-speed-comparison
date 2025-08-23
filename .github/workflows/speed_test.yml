@@ -50,7 +50,7 @@ jobs:
 
       - name: 🧪 Run Speed Tests
         run: |
-          IMAGE_TAG="${{ matrix.registry }}/${{ github.repository }}/speed-test:${{ matrix.image_size_mb }}mb-${{ github.run_id }}"
+          IMAGE_TAG="${{ matrix.registry }}/${{ github.repository }}:${{ matrix.image_size_mb }}mb-${{ github.run_id }}"
           echo "Testing with image: $IMAGE_TAG of size ${{ matrix.image_size_mb }}MB"
           
           # 1. BUILD & PUSH TEST
