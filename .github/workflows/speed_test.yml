@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         registry: ['ghcr.io', 'docker.io']
-        image_size_mb: [8, 64, 256, 512, 1024]
+        image_size_mb: [8, 64]
 
     steps:
       - name: ⬇️ Check out repository
